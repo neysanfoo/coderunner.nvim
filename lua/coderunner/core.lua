@@ -27,32 +27,44 @@ function M.setup(config)
 		if type(command) == "table" then
 			for i, cmd in ipairs(command) do
 				command[i] = cmd:gsub("$dir", dir)
-					:gsub("$fullFilePath", fullFilePath)
-					:gsub("$fileNameWithoutExt", fileNameWithoutExt)
+						:gsub("$fullFilePath", fullFilePath)
+						:gsub("$fileNameWithoutExt", fileNameWithoutExt)
 			end
 			command = table.concat(command, " && ")
 		else
 			command = command
-				:gsub("$dir", dir)
-				:gsub("$fullFilePath", fullFilePath)
-				:gsub("$fileNameWithoutExt", fileNameWithoutExt)
+					:gsub("$dir", dir)
+					:gsub("$fullFilePath", fullFilePath)
+					:gsub("$fileNameWithoutExt", fileNameWithoutExt)
 		end
 
 		-- Debug line
 		print(command)
+
 		return command
 	end
 
-	vim.api.nvim_create_user_command("Run", function()
-		-- If a previous output window and buffer exists, close and delete them
-		if output_win_buf.winid and output_win_buf.bufnr then
-			if vim.api.nvim_win_is_valid(output_win_buf.winid) and #vim.api.nvim_tabpage_list_wins(0) > 1 then
-				vim.api.nvim_win_close(output_win_buf.winid, true)
-			end
-			if vim.api.nvim_buf_is_valid(output_win_buf.bufnr) then
-				vim.api.nvim_buf_delete(output_win_buf.bufnr, { force = true })
-			end
+	-- Function to clean up the terminal window and buffer
+	local function cleanup_terminal()
+		if output_win_buf.winid and vim.api.nvim_win_is_valid(output_win_buf.winid) then
+			-- Close the window first
+			vim.api.nvim_win_close(output_win_buf.winid, true)
+			output_win_buf.winid = nil
 		end
+
+		if output_win_buf.bufnr and vim.api.nvim_buf_is_valid(output_win_buf.bufnr) then
+			-- Force delete the buffer
+			vim.api.nvim_buf_delete(output_win_buf.bufnr, { force = true })
+			output_win_buf.bufnr = nil
+		end
+
+		-- Small delay to ensure cleanup is complete
+		vim.cmd("sleep 50m")
+	end
+
+	vim.api.nvim_create_user_command("Run", function()
+		-- Always cleanup previous terminal
+		cleanup_terminal()
 
 		-- Get the command to run based on the filetype
 		local command = run_filetype_command()
@@ -62,18 +74,26 @@ function M.setup(config)
 
 		local height = vim.api.nvim_get_option("lines")
 		local split_size = math.min(config.buffer_height, height)
-
 		local current_win = vim.api.nvim_get_current_win()
-		vim.cmd(split_size .. "new")
 
+		-- Create new window and set it up
+		vim.cmd(split_size .. "new")
 		local output_win = vim.api.nvim_get_current_win()
-		vim.fn.termopen(command)
+
+		-- Start terminal with command
+		local job_id = vim.fn.termopen(command, {
+			on_exit = function(_, exit_code)
+				if exit_code ~= 0 then
+					-- Optional: Handle non-zero exit codes
+				end
+			end,
+		})
 
 		local output_bufnr = vim.api.nvim_win_get_buf(output_win)
-
 		output_win_buf.winid = output_win
 		output_win_buf.bufnr = output_bufnr
 
+		-- Set up terminal mappings
 		vim.api.nvim_exec(
 			[[
             function! ConditionalBwipeout(cmdline)
