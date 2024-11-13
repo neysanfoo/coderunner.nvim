@@ -4,10 +4,35 @@ coderunner is a lightweight plugin for NeoVim which enables you to run code in v
 
 ## Install
 
-- With [packer.nvim](https://github.com/wbthomason/packer.nvim)
+### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
-use 'neysanfoo/coderunner'
+{
+    "neysanfoo/coderunner.nvim",
+    config = function()
+        require("coderunner").setup({
+            filetype_commands = {
+                python = 'python3 -u "$fullFilePath"',
+                lua = "lua",
+                c = { 'gcc "$fullFilePath" -o "$dir/out"', '"$dir/./out"' },
+                cpp = { 'g++ "$fullFilePath" -o "$dir/out"', '"$dir/./out"' },
+                java = { 'javac "$fullFilePath"', 'java -cp ".:$dir" "$fileNameWithoutExt"' },
+                javascript = 'node "$fullFilePath"',
+                -- add other filetypes and their corresponding run commands here
+            },
+            buffer_height = 10, -- height in lines
+            focus_back = false, -- whether to set the cursor back to the original window after running the code
+        })
+        -- Optional: Add a keybinding
+        vim.keymap.set("n", "<Leader>i", "<cmd>Run<cr>", { noremap = true, silent = true })
+    end,
+}
+```
+
+### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+use 'neysanfoo/coderunner.nvim'
 ```
 
 ## Setup
